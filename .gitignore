@@ -1,0 +1,54 @@
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Build output
+.dist/
+dist/
+build/
+out/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm
+.yarn-integrity
+
+# Env files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Prisma generated client (regenerated via `prisma generate`)
+node_modules/.prisma/
+
+# Temporary files
+*.tmp
+*.temp
