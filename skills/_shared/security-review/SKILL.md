@@ -1,121 +1,62 @@
 ---
 name: ts-ddd-security-review
-description: Security review for TypeScript DDD clean architecture code — checks for injection, auth/authz issues, data exposure, and insecure dependencies. Trigger when the user says "security review", "check for vulnerabilities", "is this secure?", "review auth code", "check this for OWASP issues", "audit this endpoint", or when changes touch authentication, authorization, input handling, external API calls, file uploads, or any user-controlled data. Also trigger before deploying to production or before a security audit.
+description: Security review for TypeScript DDD code — OWASP-mapped checks for injection, auth/authz, data exposure, and misconfiguration. Trigger when the user says "security review", "check for vulnerabilities", "is this secure?", "review auth code", or when changes touch authentication, authorization, input handling, external APIs, file uploads, or user-controlled data.
 ---
 
 # Security Review — TypeScript DDD
 
-Systematic security check scoped to the concerns most relevant to TypeScript backend services built on clean architecture. Each finding maps to an OWASP category where applicable.
+## Checklist
 
-## Review by concern
+**Injection (OWASP A03)**
+- All DB queries use parameterized queries or ORM methods — no string interpolation in SQL
+- Flag every raw query: `query()`, `$queryRaw()`, raw `createQueryBuilder().where()`
+- No `child_process.exec()` with user-controlled input — use `execFile()` with argument array
 
-### 1. Injection (OWASP A03)
+**Auth & Authorization (OWASP A01, A07)**
+- JWT secrets from env vars, not hardcoded; `expiresIn` is set
+- Passwords hashed with `bcrypt`/`argon2` (min cost 10) — never `md5`, `sha1`, `sha256` alone
+- Every protected endpoint has an auth guard
+- Authorization checks at **use case level**, not only at the controller
+- Resource ownership verified: `userId` from JWT, not from request body
+- Can a non-admin call an admin use case by changing a request param?
 
-**SQL / NoSQL injection**
-- [ ] All queries use parameterized queries or ORM methods — no string interpolation in SQL
-- [ ] Raw query methods (`query()`, `$queryRaw()`, `createQueryBuilder().where(raw)`) — flag each one
+**Sensitive Data (OWASP A02)**
+- Passwords/secrets/PII not logged — check `console.log`, logger calls, error serializers
+- Response DTOs exclude `passwordHash`, `internalId`, `adminNotes`
+- DB connection strings and API keys in env vars; `.env` in `.gitignore`
 
-**Command injection**
-- [ ] No `child_process.exec()` or `execSync()` with user-controlled input
-- [ ] If shell commands are needed, use `execFile()` with an argument array, never template strings
+**Input Validation (OWASP A03, A04)**
+- Request bodies validated at presentation layer (`class-validator`, `zod`, `joi`)
+- Validation happens before reaching the application layer
+- Max length constraints on text fields; file uploads: type-checked, size-limited, outside webroot
+- UUID/ID format validated before hitting the repository
 
----
+**Security Misconfiguration (OWASP A05)**
+- CORS not `origin: '*'` in production
+- Helmet headers applied: `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`
+- Stack traces not exposed in production responses
+- Debug endpoints (`/metrics`, `/health`, `/debug`) are internal-only or auth-protected
 
-### 2. Authentication and Authorization (OWASP A01, A07)
+**Cryptography & Dependencies**
+- `crypto.randomBytes()` for token generation — not `Math.random()`
+- Secrets compared with `timingSafeEqual()` — not `===` (prevents timing attacks)
+- No `rejectUnauthorized: false` in HTTP clients
+- `npm audit` run — no high/critical unresolved vulnerabilities
+- Rate limiting on auth endpoints (login, register, password reset)
 
-**Authentication**
-- [ ] JWT secrets are loaded from environment variables, not hardcoded
-- [ ] JWT `expiresIn` is set — tokens do not live forever
-- [ ] Passwords are hashed with `bcrypt` or `argon2` (min cost factor 10) — never `md5`, `sha1`, `sha256` alone
+## Severity
 
-**Authorization**
-- [ ] Every protected endpoint has an auth guard
-- [ ] Authorization checks happen at the **use case level**, not only at the controller
-- [ ] Resource ownership is verified — `userId` from JWT, not from request body
-- [ ] Privilege escalation check: can a non-admin user call an admin use case by changing a request param?
+- **[CRITICAL]** — Exploitable without auth (SQLi, RCE, auth bypass)
+- **[HIGH]** — Requires auth, high impact (privilege escalation, data leak)
+- **[MEDIUM]** — Defense-in-depth issue, misconfiguration, limited scope
+- **[LOW]** — Hardening improvement, no direct exploitability
 
----
+## DDD-specific
 
-### 3. Sensitive Data Exposure (OWASP A02)
+- Domain events must not carry PII — events may reach external buses
+- Value Objects (`Email`, `PhoneNumber`) validate format on construction — natural security boundary
+- Aggregate IDs should be UUIDs — sequential IDs allow enumeration attacks
 
-- [ ] Passwords, secrets, PII are never logged — check `console.log`, `logger.info`, error serializers
-- [ ] Response DTOs do not include `passwordHash`, `internalId`, or `adminNotes`
-- [ ] Database connection strings and API keys are in env vars, not committed to git
-- [ ] `.env` is in `.gitignore`
+## Output format
 
----
-
-### 4. Input Validation (OWASP A03, A04)
-
-- [ ] Request bodies are validated at the presentation layer (e.g. `class-validator`, `zod`, `joi`)
-- [ ] Validation happens **before** reaching the application layer
-- [ ] Max length constraints on text fields — no unbounded string inputs to DB
-- [ ] File uploads: type checked, size limited, stored outside webroot
-- [ ] UUID/ID format validated before hitting the repository
-
----
-
-### 5. Security Misconfiguration (OWASP A05)
-
-- [ ] CORS is configured restrictively — `origin: '*'` in production is a red flag
-- [ ] Helmet (or equivalent headers) applied: `X-Content-Type-Options`, `X-Frame-Options`, `Strict-Transport-Security`
-- [ ] Stack traces and detailed errors are not exposed in production responses
-- [ ] Debug endpoints (`/metrics`, `/health`, `/debug`) are either internal-only or auth-protected
-
----
-
-### 6. Cryptography (OWASP A02)
-
-- [ ] `crypto.randomBytes()` used for token generation — not `Math.random()`
-- [ ] Secrets comparison uses `timingSafeEqual()` — not `===` (prevents timing attacks)
-- [ ] No `rejectUnauthorized: false` in HTTP clients
-
----
-
-### 7. Dependency vulnerabilities (OWASP A06)
-
-- [ ] `npm audit` has been run — no high/critical unresolved vulnerabilities
-- [ ] Dependencies are pinned or use lock files committed
-
----
-
-### 8. Rate limiting and DoS (OWASP A04)
-
-- [ ] Rate limiting applied to auth endpoints (login, register, password reset)
-- [ ] File upload endpoints have size limits
-- [ ] Expensive queries have pagination
-
----
-
-## Severity classification
-
-- **[CRITICAL]** — Exploitable without authentication (SQLi, RCE, auth bypass)
-- **[HIGH]** — Requires authentication but has high impact (privilege escalation, data leak)
-- **[MEDIUM]** — Defense-in-depth issue, misconfiguration, or limited-scope exposure
-- **[LOW]** — Informational, hardening improvement, no direct exploitability
-
----
-
-## Report format
-
-```
-## Security Review
-
-### [CRITICAL] SQL injection via raw query
-`src/orders/infrastructure/OrderRepository.ts` line 47 uses a raw query with
-string interpolation. An attacker controlling the input can execute arbitrary SQL.
-Fix: Use the ORM parameterized method or a prepared statement with placeholders.
-
-### [HIGH] Authorization checked only at controller, not use case
-CancelOrderUseCase does not verify that the requesting user owns the order.
-An authenticated user can cancel any order by supplying a different orderId.
-Fix: Pass requestingUserId into the use case and verify order.customerId.equals(requestingUserId).
-```
-
----
-
-## DDD-specific security notes
-
-- **Domain events must not leak sensitive data** — events may be published to external buses; strip PII or encrypt sensitive fields before publishing
-- **Value Objects validate their own format** — `Email`, `PhoneNumber`, `Url` VOs should throw on invalid input, providing a natural validation boundary
-- **Aggregate IDs should be UUIDs** — sequential IDs allow enumeration attacks
+Numbered list, most critical first. Each finding: **[SEVERITY] Title** → location + exploit scenario + fix.
