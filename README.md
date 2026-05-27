@@ -24,7 +24,7 @@ Drop these skills into your `~/.claude/skills/` folder and Claude will automatic
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/ts-ddd-clean-architecture.git
+git clone https://github.com/Methasit-Pun/ts-ddd-clean-architecture.git
 
 # Copy all skills into your Claude skills directory
 cp -r ts-ddd-clean-architecture/skills/* ~/.claude/skills/
