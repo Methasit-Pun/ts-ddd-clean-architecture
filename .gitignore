@@ -52,3 +52,6 @@ node_modules/.prisma/
 # Temporary files
 *.tmp
 *.temp
+
+
+.claude/skills/skill-creator
